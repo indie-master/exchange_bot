@@ -1,37 +1,29 @@
 #!/bin/bash
 
-# Скрипт установки и запуска проекта
+echo "=== Установка Exchange Bot ==="
 
-echo "=== Начало установки проекта ==="
+# 1. Проверка и установка необходимых пакетов
+echo "Обновляем систему и устанавливаем зависимости..."
+sudo apt update && sudo apt install -y python3 python3-pip python3-venv git
 
-# 1. Обновление системы
-echo "Обновляем список пакетов..."
-sudo apt update && sudo apt upgrade -y
-
-# 2. Установка необходимых пакетов
-echo "Устанавливаем Python, pip, и git..."
-sudo apt install -y python3 python3-pip python3-venv git
-
-# 3. Клонирование репозитория
+# 2. Клонирование репозитория
 REPO_URL="https://github.com/indie-master/exchange_bot.git"
 INSTALL_DIR="$HOME/exchange_bot"
 
 if [ -d "$INSTALL_DIR" ]; then
-    echo "Каталог $INSTALL_DIR уже существует. Обновляем репозиторий..."
-    cd "$INSTALL_DIR" && git pull
-else
-    echo "Клонируем репозиторий..."
-    git clone "$REPO_URL" "$INSTALL_DIR"
+    echo "Каталог $INSTALL_DIR уже существует. Удаляем старую версию..."
+    rm -rf "$INSTALL_DIR"
 fi
 
-# Переход в каталог проекта
-cd "$INSTALL_DIR"
+echo "Клонируем репозиторий..."
+git clone "$REPO_URL" "$INSTALL_DIR"
+
+# 3. Переход в каталог проекта
+cd "$INSTALL_DIR" || exit
 
 # 4. Настройка виртуального окружения
-echo "Создаем и активируем виртуальное окружение..."
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
-fi
+echo "Создаем виртуальное окружение..."
+python3 -m venv venv
 source venv/bin/activate
 
 # 5. Установка зависимостей
@@ -40,35 +32,33 @@ pip install --upgrade pip
 if [ -f requirements.txt ]; then
     pip install -r requirements.txt
 else
-    echo "Файл requirements.txt не найден! Убедитесь, что он есть в репозитории."
+    echo "Файл requirements.txt не найден. Убедитесь, что он есть в репозитории."
     exit 1
 fi
 
-# 6. Настройка переменных окружения
-echo "Проверяем файл .env..."
-if [ ! -f .env ]; then
-    echo "Файл .env отсутствует. Создаем шаблон..."
-    cat > .env <<EOL
-# Замените эти значения своими
-BOT_TOKEN=your_bot_token
-API_KEY=you_api_key
-EOL
-    echo "Файл .env создан. Пожалуйста, отредактируйте его перед запуском!"
+# 6. Настройка .env файла
+ENV_FILE=".env"
+if [ ! -f "$ENV_FILE" ]; then
+    echo "Создаем .env файл..."
+    touch "$ENV_FILE"
 else
     echo "Файл .env уже существует."
 fi
 
-# 7. Проверка структуры проекта
-MAIN_SCRIPT="exchange_bot.py" # Замените на имя вашего основного файла
-if [ ! -f "$MAIN_SCRIPT" ]; then
-    echo "Файл $MAIN_SCRIPT не найден! Укажите правильное название основного файла."
-    echo "Или вручную отредактируйте переменную MAIN_SCRIPT в этом скрипте."
-    exit 1
-fi
+echo "Пожалуйста, введите API_KEY для вашего бота:"
+read -r API_KEY
+echo "API_KEY=$API_KEY" > "$ENV_FILE"
 
-# 8. Запуск проекта
-echo "Запускаем проект..."
-nohup python3 "$MAIN_SCRIPT" > bot.log 2>&1 &
+echo "Пожалуйста, введите BOT_TOKEN для вашего бота:"
+read -r BOT_TOKEN
+echo "BOT_TOKEN=$BOT_TOKEN" >> "$ENV_FILE"
+
+echo ".env файл настроен!"
+
+# 7. Запуск бота
+echo "Запускаем бота..."
+nohup python3 exchange_bot.py > bot.log 2>&1 &
 
 echo "=== Установка завершена! ==="
 echo "Бот запущен в фоновом режиме. Логи записываются в bot.log."
+
