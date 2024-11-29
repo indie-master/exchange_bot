@@ -12,5 +12,5 @@ Telegram-бот для получения и конвертации валютн
 
 1. **Клонировать репозиторий:**
    ```bash
-   git clone https://github.com/undie-master/exchange-bot.git
-   cd exchange-bot
+   git clone https://github.com/undie-master/exchange_bot.git
+   cd exchange_bot
