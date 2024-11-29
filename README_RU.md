@@ -75,3 +75,59 @@ nohup python3 exchange_bot.py > bot.log 2>&1 &
 ps aux | grep exchange_bot.py
 kill <PROCESS_ID>
 ````
+
+## Настройка через Systemd
+### 1. Создайте файл сервиса:
+Откройте редактор и создайте новый файл:
+
+````
+sudo nano /etc/systemd/system/exchange_bot.service
+````
+
+Добавьте следующую конфигурацию:
+````
+[Unit]
+Description=Exchange Bot
+After=network.target
+
+[Service]
+User=<ваш_пользователь>
+WorkingDirectory=/<ваш_пользователь>/exchange_bot
+ExecStart=/<ваш_пользователь>/exchange_bot/venv/bin/python3 exchange_bot.py
+Restart=always
+EnvironmentFile=/<ваш_пользователь>/exchange_bot/.env
+
+[Install]
+WantedBy=multi-user.target
+````
+
+Замените `<ваш_пользователь>` на имя вашего пользователя.
+
+### 2. Перезагрузите Systemd и активируйте сервис:
+
+````
+sudo systemctl daemon-reload
+sudo systemctl enable exchange_bot
+````
+
+### 3. Запустите бота:
+
+````
+sudo systemctl start exchange_bot
+````
+
+### 4. Рестарт после изменений:
+После изменения токена или кода перезапустите сервис:
+
+````
+sudo systemctl restart exchange_bot
+````
+
+### 5. Проверка статуса:
+Убедитесь, что бот работает:
+
+````
+sudo systemctl status exchange_bot
+````
+
+Настройка через Systemd автоматизирует перезапуск и упрощает управление ботом.
