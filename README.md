@@ -75,3 +75,59 @@ To stop the process, find its ID and complete:
 ps aux | grep exchange_bot.py
 kill <PROCESS_ID>
 ````
+
+## Setup via Systemd
+### 1. Create a service file:
+Open the editor and create a new file:
+
+````
+sudo nano /etc/systemd/system/exchange_bot.service
+````
+
+Add the following configuration:
+````
+[Unit]
+Description=Exchange Bot
+After=network.target
+
+[Service]
+User=<your_user>
+WorkingDirectory=/<your_user>/exchange_bot
+ExecStart=/<your_user>/exchange_bot/venv/bin/python3 exchange_bot.py
+Restart=always
+EnvironmentFile=/<your_user>/exchange_bot/.env
+
+[Install]
+WantedBy=multi-user.target
+````
+
+Replace `<your_user>` with your username.
+
+### 2. Restart Systemd and activate the service:
+
+````
+sudo systemctl daemon-reload
+sudo systemctl enable exchange_bot
+````
+
+### 3. Launch the bot:
+
+````
+sudo systemctl start exchange_bot
+````
+
+### 4. Restart after changes:
+After changing the token or code, restart the service:
+
+````
+sudo systemctl restart exchange_bot
+````
+
+### 5. Checking the status:
+Make sure that the bot is working:
+
+````
+sudo systemctl status exchange_bot
+````
+
+Setting up via Systemd automates restarts and simplifies bot management.
