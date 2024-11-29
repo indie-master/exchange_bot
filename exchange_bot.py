@@ -1,9 +1,18 @@
 import requests
+import os
+from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, Updater, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# Вставьте ваш API ключ
-API_KEY = '52073917cd526850614660da'
+# Загрузка переменных окружения из файла .env
+load_dotenv()
+
+# Получение токенов
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+API_KEY = os.getenv('API_KEY')
+
+if not BOT_TOKEN or not API_KEY:
+    raise ValueError("Не удалось загрузить BOT_TOKEN или API_KEY. Проверьте файл .env.")
 
 # Эндпоинты для разных валют
 BASE_URL_USD = f'https://v6.exchangerate-api.com/v6/{API_KEY}/latest/USD'
@@ -13,15 +22,23 @@ BASE_URL_CNY = f'https://v6.exchangerate-api.com/v6/{API_KEY}/latest/CNY'
 
 async def fetch_exchange_rates():
     """Получить курсы валют."""
-    response_usd = requests.get(BASE_URL_USD).json()
-    response_eur = requests.get(BASE_URL_EUR).json()
-    response_cny = requests.get(BASE_URL_CNY).json()
+    try:
+        response_usd = requests.get(BASE_URL_USD).json()
+        response_eur = requests.get(BASE_URL_EUR).json()
+        response_cny = requests.get(BASE_URL_CNY).json()
 
-    return {
-        'USD': response_usd['conversion_rates'].get('RUB', "Не доступно"),
-        'EUR': response_eur['conversion_rates'].get('RUB', "Не доступно"),
-        'CNY': response_cny['conversion_rates'].get('RUB', "Не доступно")
-    }
+        return {
+            'USD': response_usd['conversion_rates'].get('RUB', "Не доступно"),
+            'EUR': response_eur['conversion_rates'].get('RUB', "Не доступно"),
+            'CNY': response_cny['conversion_rates'].get('RUB', "Не доступно")
+        }
+    except Exception as e:
+        print(f"Ошибка при получении курсов валют: {e}")
+        return {
+            'USD': "Не доступно",
+            'EUR': "Не доступно",
+            'CNY': "Не доступно"
+        }
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -110,30 +127,14 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await start(update, context)
 
 
-async def back_to_rates(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Возвращает пользователя в меню выбора валют."""
-    keyboard = [
-        [InlineKeyboardButton("USD к RUB", callback_data="USD"), 
-         InlineKeyboardButton("EUR к RUB", callback_data="EUR"),
-         InlineKeyboardButton("CNY к RUB", callback_data="CNY")],
-        [InlineKeyboardButton("Назад", callback_data="back_to_main")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.callback_query.message.edit_text(
-        text="Выберите валюту для конвертации:",
-        reply_markup=reply_markup
-    )
-
-
 def main():
     """Основной цикл бота."""
-    application = Application.builder().token("7957019843:AAF1LnZTCNZt6RLhr3HLxeL7VQpbUh00dlo").build()
+    application = Application.builder().token(BOT_TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(view_rates, pattern="view_rates"))
     application.add_handler(CallbackQueryHandler(calculate, pattern="^(USD|EUR|CNY)$"))
     application.add_handler(CallbackQueryHandler(back_to_main, pattern="back_to_main"))
-    application.add_handler(CallbackQueryHandler(back_to_rates, pattern="view_rates"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_amount))
 
     application.run_polling()
