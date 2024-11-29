@@ -50,8 +50,8 @@ if [ ! -f .env ]; then
     echo "Файл .env отсутствует. Создаем шаблон..."
     cat > .env <<EOL
 # Замените эти значения своими
-TOKEN=your_bot_token
-DATABASE_URL=sqlite:///database.db
+BOT_TOKEN=your_bot_token
+API_KEY=you_api_key
 EOL
     echo "Файл .env создан. Пожалуйста, отредактируйте его перед запуском!"
 else
