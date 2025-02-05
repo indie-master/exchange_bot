@@ -95,6 +95,9 @@ User=<your_user>
 WorkingDirectory=/<your_user>/exchange_bot
 ExecStart=/<your_user>/exchange_bot/venv/bin/python3 exchange_bot.py
 Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
 EnvironmentFile=/<your_user>/exchange_bot/.env
 
 [Install]
