@@ -8,6 +8,23 @@ You will need:
 
 `BOT Token of your TG bot`
 
+## Docker
+If you prefer to run the bot in an isolated container, build the image and supply your
+credentials via environment variables (or an `.env` file):
+
+````bash
+docker build -t exchange-bot .
+
+# pass env vars directly
+docker run --rm \
+  -e BOT_TOKEN=your_token \
+  -e API_KEY=your_api_key \
+  exchange-bot
+
+# or reuse an existing .env file
+docker run --rm --env-file .env exchange-bot
+````
+
 ## Manual installation
 If you want to run the bot locally or deploy it manually, follow the steps below:
 
