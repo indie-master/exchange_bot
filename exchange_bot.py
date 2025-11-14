@@ -80,16 +80,15 @@ def build_result_keyboard(base: str, target: str) -> InlineKeyboardMarkup:
 
 
 def format_rates_summary(rates: Dict[str, Dict[str, float]]) -> str:
-    lines = []
+    lines = ["Актуальные курсы на текущий момент:"]
     for base in CURRENCIES:
         conversions = []
         for target in CURRENCIES:
             if target == base:
                 continue
             rate = rates.get(base, {}).get(target)
-            conversions.append(f"{target}: {_format_rate(rate)}")
-        base_line = f"1 {base} → " + " | ".join(conversions)
-        lines.append(base_line)
+            conversions.append(f"1 {base} = {_format_rate(rate)} {target}")
+        lines.append(" • " + "; ".join(conversions))
     return "\n".join(lines)
 
 
@@ -118,34 +117,13 @@ async def ensure_rates(context: ContextTypes.DEFAULT_TYPE, force_refresh: bool =
     return context.user_data["rates"]
 
 
-def build_welcome_message(rates: Dict[str, Dict[str, float]], *, refreshed: bool = False) -> str:
-    header = [
-        "✨ Добро пожаловать в конвертер валют!",
-        "Здесь вы мгновенно узнаете актуальные курсы и можете конвертировать нужную сумму.",
-    ]
-    if refreshed:
-        header.append("✅ Курсы только что обновлены.")
-
-    rates_block = [
-        "\n📊 Актуальные курсы:",
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        format_rates_summary(rates),
-        "━━━━━━━━━━━━━━━━━━━━━━",
-    ]
-
-    menu_hint = [
-        "\n📋 Меню действий:",
-        "• Нажмите на валюту, чтобы выбрать базовую.",
-        "• После выбора укажите валюту назначения и введите сумму.",
-        "• Используйте кнопку 🔄, чтобы обновить данные в любой момент.",
-    ]
-
-    return "\n".join(header + rates_block + menu_hint)
-
-
 async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, *, refreshed: bool = False) -> None:
     rates = await ensure_rates(context, force_refresh=refreshed)
-    message = build_welcome_message(rates, refreshed=refreshed)
+    message = (
+        "Добро пожаловать в конвертер валют!\n"
+        "Выберите валюту, которую хотите конвертировать, или обновите курсы.\n\n"
+        f"{format_rates_summary(rates)}"
+    )
     reply_markup = build_main_menu()
 
     if update.message:

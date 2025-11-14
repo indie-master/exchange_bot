@@ -106,6 +106,27 @@ Running the `CBR-rates` command without arguments opens a menu with the followin
 
 You can also run a single command directly, for example `./CBR-rates status` or `./CBR-rates restart`.
 
+### Use the CLI from anywhere
+To avoid changing directories every time, create a symlink that points to the CLI and add it to your `$PATH`:
+
+```
+sudo ln -s /home/bot/exchange_bot/CBR-rates /usr/local/bin/CBR-rates
+```
+
+When the CLI is executed through such a symlink (or from another folder) it will automatically switch to the repository root. If the symlink lives outside of the repository, define the target directory explicitly once via the `EXCHANGE_BOT_ROOT` environment variable:
+
+```
+export EXCHANGE_BOT_ROOT=/home/bot/exchange_bot
+```
+
+With the variable set you can call `CBR-rates` from any directory. When you are inside the repository already you can simply run `CBR-rates` (or even `python CBR-rates`) without any additional parameters thanks to the script's automatic root detection. The launcher also walks up from the current directory to locate the repository root, so it works even from nested subfolders. For a one-off invocation outside of the repository you can pass the path explicitly without touching the environment:
+
+```
+CBR-rates -C /home/bot/exchange_bot status
+```
+
+The `-C/--root` flag has priority over `EXCHANGE_BOT_ROOT` and is stripped before the rest of the arguments are forwarded to the CLI menu.
+
 ### Restart the bot
 If you need to restart the bot, run the following commands:
 ````
