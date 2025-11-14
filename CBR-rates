@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+SERVICE_NAME="cbr_rates_bot.service"
+SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME"
+REPO_DIR="$HOME/CBR-rates-bot"
+LOG_LINES=100
+
+if ! command -v systemctl >/dev/null 2>&1; then
+  echo "systemctl is required for this command to work."
+  exit 1
+fi
+
+show_menu() {
+  cat <<'MENU'
+========================================
+     CBR-rates-bot management menu
+========================================
+1) Status           - Show current service status
+2) Update           - Pull the latest code from the repository
+3) Restart          - Restart the bot service
+4) Reload           - Reload the systemd unit and bot
+5) Logs             - Tail the latest service logs
+6) Stop             - Stop the bot service
+7) Start            - Start the bot service
+8) Delete           - Stop, disable and remove the bot
+0) Exit
+MENU
+}
+
+require_repo() {
+  if [[ ! -d "$REPO_DIR/.git" ]]; then
+    echo "Repository not found in $REPO_DIR"
+    return 1
+  fi
+  return 0
+}
+
+status_cmd() {
+  sudo systemctl status --no-pager "$SERVICE_NAME"
+}
+
+update_cmd() {
+  if ! require_repo; then
+    return 1
+  fi
+  pushd "$REPO_DIR" >/dev/null || return 1
+  git fetch --all && git pull --rebase
+  popd >/dev/null || true
+}
+
+restart_cmd() {
+  sudo systemctl restart "$SERVICE_NAME"
+}
+
+reload_cmd() {
+  if [[ -f "$SERVICE_FILE" ]]; then
+    sudo systemctl daemon-reload
+  fi
+  sudo systemctl reload "$SERVICE_NAME" || sudo systemctl restart "$SERVICE_NAME"
+}
+
+logs_cmd() {
+  sudo journalctl -u "$SERVICE_NAME" -n "$LOG_LINES" -f
+}
+
+stop_cmd() {
+  sudo systemctl stop "$SERVICE_NAME"
+}
+
+start_cmd() {
+  sudo systemctl start "$SERVICE_NAME"
+}
+
+delete_cmd() {
+  echo "This will stop the bot, disable the service and delete $REPO_DIR."
+  read -r -p "Are you sure? [y/N]: " answer
+  case "$answer" in
+    [yY][eE][sS]|[yY])
+      sudo systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+      sudo systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+      if [[ -f "$SERVICE_FILE" ]]; then
+        sudo rm -f "$SERVICE_FILE"
+        sudo systemctl daemon-reload
+      fi
+      rm -rf "$REPO_DIR"
+      echo "CBR-rates-bot has been removed."
+      ;;
+    *)
+      echo "Deletion cancelled."
+      ;;
+  esac
+}
+
+while true; do
+  show_menu
+  read -r -p "Select an option: " choice
+  case "$choice" in
+    1) status_cmd ;;
+    2) update_cmd ;;
+    3) restart_cmd ;;
+    4) reload_cmd ;;
+    5) logs_cmd ;;
+    6) stop_cmd ;;
+    7) start_cmd ;;
+    8) delete_cmd ;;
+    0) exit 0 ;;
+    *) echo "Unknown option" ;;
+  esac
+  echo
+  read -r -p "Press Enter to return to the menu..." _
+  echo
+done

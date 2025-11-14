@@ -1,14 +1,14 @@
 #!/bin/bash
 
-echo "=== Установка Exchange Bot ==="
+echo "=== Установка CBR-rates-bot ==="
 
 # 1. Проверка и установка необходимых пакетов
 echo "Обновляем систему и устанавливаем зависимости..."
 sudo apt update && sudo apt install -y python3 python3-pip python3-venv git
 
 # 2. Клонирование репозитория
-REPO_URL="https://github.com/indie-master/exchange_bot.git"
-INSTALL_DIR="$HOME/exchange_bot"
+REPO_URL="https://github.com/indie-master/CBR-rates-bot.git"
+INSTALL_DIR="$HOME/CBR-rates-bot"
 
 if [ -d "$INSTALL_DIR" ]; then
     echo "Каталог $INSTALL_DIR уже существует. Удаляем старую версию..."
