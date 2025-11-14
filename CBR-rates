@@ -26,6 +26,12 @@ def _detect_repo_root(forced_root: Path | None) -> Path:
     if forced_root:
         candidates.append(forced_root)
 
+    # When the command is executed from the repository root manually, the
+    # current working directory already contains ``bot_cli.py``. Adding it as a
+    # candidate means developers can run ``python CBR-rates`` without setting
+    # extra flags or environment variables.
+    candidates.append(Path.cwd())
+
     env_root = os.environ.get("EXCHANGE_BOT_ROOT")
     if env_root:
         candidates.append(Path(env_root).expanduser())
