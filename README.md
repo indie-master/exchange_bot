@@ -8,6 +8,28 @@ You will need:
 
 `BOT Token of your TG bot`
 
+## Manual installation
+If you want to run the bot locally or deploy it manually, follow the steps below:
+
+````bash
+git clone https://github.com/indie-master/exchange_bot.git
+cd exchange_bot
+
+# (optional) create a virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# install dependencies
+pip install -r requirements.txt
+
+# configure environment variables
+echo "BOT_TOKEN=your_token" >> .env
+echo "API_KEY=your_api_key" >> .env
+
+# run the bot
+python3 exchange_bot.py
+````
+
 ## Installation and launch
 Follow the steps below to install and run the bot on your server.
 
