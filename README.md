@@ -61,6 +61,43 @@ tail -f bot.log
 Make sure that the bot is active and working correctly.
 
 ## Additional
+### CLI manager (CBR-rates)
+After cloning or installing the project you can manage the bot through the interactive CLI helper:
+
+```
+cd ~/exchange_bot
+./CBR-rates
+```
+
+Running the `CBR-rates` command without arguments opens a menu with the following actions:
+
+| Command  | Description |
+|----------|-------------|
+| `status` | Show whether the background bot process is running and display the log path. |
+| `update` | Fetch the latest changes from the git repository (`git pull --ff-only`). |
+| `restart`| Stop and start the bot again. |
+| `reload` | Graceful restart that re-reads `.env` and the Python code. |
+| `logs`   | Print the last lines of `bot.log`. |
+| `stop`   | Terminate the background bot process. |
+| `start`  | Start the bot if it is not running. |
+| `delete` | Stop the bot and remove helper files (`bot.log`, `bot.pid`). |
+
+You can also run a single command directly, for example `./CBR-rates status` or `./CBR-rates restart`.
+
+To avoid changing directories every time, create a symlink that points to the CLI and add it to your `$PATH`:
+
+```
+sudo ln -s /home/bot/exchange_bot/CBR-rates /usr/local/bin/CBR-rates
+```
+
+When the CLI is executed through such a symlink (or from another folder) it will automatically switch to the repository root. If the symlink lives outside of the repository, define the target directory explicitly once via the `EXCHANGE_BOT_ROOT` environment variable:
+
+```
+export EXCHANGE_BOT_ROOT=/home/bot/exchange_bot
+```
+
+With the variable set you can call `CBR-rates` from any directory.
+
 ### Restart the bot
 If you need to restart the bot, run the following commands:
 ````
