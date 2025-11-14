@@ -102,6 +102,8 @@ tail -f bot.log
 ## Дополнительно
 ### CLI-менеджер (CBR-rates)
 После установки проекта можно управлять ботом через интерактивный CLI.
+Менеджер перенаправляет все действия в systemd-сервис `exchange_bot`, поэтому перед
+использованием убедитесь, что вы настроили сервис согласно инструкции ниже.
 
 ```
 cd ~/exchange_bot
@@ -112,14 +114,14 @@ cd ~/exchange_bot
 
 | Команда   | Что делает |
 |-----------|------------|
-| `status`  | Показывает, запущен ли бот, и путь к файлу логов. |
+| `status`  | Выполняет `systemctl status exchange_bot --no-pager`. |
 | `update`  | Выполняет `git pull --ff-only` для обновления кода. |
-| `restart` | Останавливает и запускает бота заново. |
-| `reload`  | Мягкий перезапуск для перечитывания `.env` и исходного кода. |
-| `logs`    | Выводит последние строки файла `bot.log`. |
-| `stop`    | Останавливает фоновый процесс бота. |
-| `start`   | Запускает бота, если он не работает. |
-| `delete`  | Останавливает бота и удаляет служебные файлы (`bot.log`, `bot.pid`). |
+| `restart` | Запускает `systemctl restart exchange_bot`. |
+| `reload`  | Вызывает `systemctl reload-or-restart exchange_bot` для перечитывания `.env` и кода. |
+| `logs`    | Показывает последние строки журнала через `journalctl -u exchange_bot -n 40`. |
+| `stop`    | Выполняет `systemctl stop exchange_bot`. |
+| `start`   | Выполняет `systemctl start exchange_bot`. |
+| `delete`  | Выполняет `systemctl disable --now exchange_bot`, отключая автозапуск. |
 
 Любую команду можно вызвать напрямую, например `./CBR-rates status` или `./CBR-rates restart`.
 
@@ -145,18 +147,19 @@ CBR-rates -C /home/bot/exchange_bot status
 Флаг `-C/--root` имеет приоритет над `EXCHANGE_BOT_ROOT`, и после обработки он не передаётся в сам CLI.
 
 ### Перезапуск бота
-Если вам нужно перезапустить бота, выполните следующие команды:
+Если нужно перезапустить бота, вызовите unit через CLI или напрямую:
 ````
-cd ~/exchange_bot
-source venv/bin/activate`
-nohup python3 exchange_bot.py > bot.log 2>&1 &
+./CBR-rates restart
+# или
+sudo systemctl restart exchange_bot
 ````
 
 ### Остановка бота
-Для остановки процесса найдите его ID и завершите:
+Для полной остановки сервиса выполните:
 ````
-ps aux | grep exchange_bot.py
-kill <PROCESS_ID>
+./CBR-rates stop
+# или
+sudo systemctl stop exchange_bot
 ````
 
 ## Настройка через Systemd
