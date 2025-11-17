@@ -1,135 +1,146 @@
-"""Command-line helper for managing the exchange bot lifecycle."""
+"""Command-line helper that proxies bot actions to the systemd service."""
 from __future__ import annotations
 
 import os
-import signal
 import subprocess
 import sys
 import textwrap
-import time
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Tuple
 
 BASE_DIR = Path(__file__).resolve().parent
-BOT_SCRIPT = BASE_DIR / "exchange_bot.py"
-LOG_FILE = BASE_DIR / "bot.log"
-PID_FILE = BASE_DIR / "bot.pid"
+SERVICE_NAME = "exchange_bot"
 
 
-def _read_pid() -> Optional[int]:
+def _needs_sudo() -> bool:
     try:
-        value = int(PID_FILE.read_text().strip())
-    except (FileNotFoundError, ValueError):
-        return None
-    return value or None
-
-
-def _is_process_running(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
+        return os.geteuid() != 0
+    except AttributeError:  # pragma: no cover - Windows is not a target platform
         return False
-    except PermissionError:
-        return True
+
+
+def _sudo_prefix() -> list[str]:
+    return ["sudo"] if _needs_sudo() else []
+
+
+def _systemctl_args(*extra: str) -> list[str]:
+    return [*_sudo_prefix(), "systemctl", *extra]
+
+
+def _journalctl_args(*extra: str) -> list[str]:
+    return [*_sudo_prefix(), "journalctl", *extra]
+
+
+def _run_command(command: list[str], *, capture: bool = True) -> bool:
+    if capture:
+        result = subprocess.run(command, capture_output=True, text=True)
+        stdout = result.stdout.strip()
+        stderr = result.stderr.strip()
+        if stdout:
+            print(stdout)
+        if result.returncode != 0 and stderr:
+            print(stderr)
     else:
-        return True
+        result = subprocess.run(command)
+        if result.returncode != 0:
+            joined = " ".join(command)
+            print(f"Команда '{joined}' завершилась с кодом {result.returncode}.")
+    return result.returncode == 0
 
 
-def _running_pid() -> Optional[int]:
-    pid = _read_pid()
-    if pid is None:
-        return None
-    if _is_process_running(pid):
-        return pid
-    PID_FILE.unlink(missing_ok=True)
+def _consume_root_arg(args: list[str]) -> Tuple[Optional[Path], list[str]]:
+    """Extract -C/--root if provided, returning the path and remaining args."""
+
+    if not args:
+        return None, args
+
+    normalized = []
+    root: Optional[Path] = None
+    skip_next = False
+    for idx, value in enumerate(args):
+        if skip_next:
+            skip_next = False
+            continue
+        if value in {"-C", "--root"}:
+            if idx + 1 >= len(args):
+                print("Флаг -C/--root требует путь после себя.")
+                raise SystemExit(1)
+            root = Path(args[idx + 1]).expanduser().resolve()
+            skip_next = True
+            continue
+        normalized.append(value)
+    return root, normalized
+
+
+def _find_repo_upwards(start: Path) -> Optional[Path]:
+    """Walk up from *start* until bot_cli.py is found or root is reached."""
+
+    current = start.resolve()
+    for ancestor in [current, *current.parents]:
+        if (ancestor / "bot_cli.py").exists():
+            return ancestor
     return None
 
 
-def _ensure_bot_script() -> None:
-    if not BOT_SCRIPT.exists():
-        raise FileNotFoundError(
-            "exchange_bot.py не найден. Запустите команды из корня репозитория."
-        )
+def _determine_base_dir(explicit: Optional[Path]) -> Path:
+    """Return the repository root, honoring overrides and fallbacks."""
+
+    env_root = os.environ.get("EXCHANGE_BOT_ROOT")
+    invocation_path = Path(sys.argv[0]).expanduser().resolve()
+
+    candidates = [
+        explicit,
+        Path(env_root).expanduser().resolve() if env_root else None,
+        _find_repo_upwards(invocation_path.parent),
+        _find_repo_upwards(Path.cwd()),
+        _find_repo_upwards(Path(__file__).resolve().parent),
+    ]
+
+    for candidate in candidates:
+        if candidate and (candidate / "bot_cli.py").exists():
+            return candidate
+    return Path(__file__).resolve().parent
+
+
+def _set_base_dir(path: Path) -> None:
+    global BASE_DIR
+    BASE_DIR = path
 
 
 def status() -> None:
-    pid = _running_pid()
-    if pid:
-        print(f"Бот запущен (PID {pid}). Логи: {LOG_FILE}")
-    else:
-        print("Бот не запущен.")
+    print("Проверяем состояние systemd-сервиса exchange_bot...")
+    _run_command(_systemctl_args("status", SERVICE_NAME, "--no-pager"), capture=False)
 
 
 def start() -> None:
-    if _running_pid():
-        print("Бот уже работает. Используйте restart, чтобы перезапустить.")
-        return
-
-    _ensure_bot_script()
-    LOG_FILE.touch(exist_ok=True)
-    log_handle = LOG_FILE.open("ab", buffering=0)
-    process = subprocess.Popen(  # noqa: S603, S607
-        [sys.executable, str(BOT_SCRIPT)],
-        stdout=log_handle,
-        stderr=log_handle,
-        cwd=str(BASE_DIR),
-        start_new_session=True,
-    )
-    log_handle.close()
-    PID_FILE.write_text(str(process.pid))
-    print(f"Бот запущен (PID {process.pid}). Логи: {LOG_FILE}")
-
-
-def _stop_process(pid: int) -> None:
-    os.kill(pid, signal.SIGTERM)
-    for _ in range(30):
-        if not _is_process_running(pid):
-            break
-        time.sleep(0.2)
-    else:
-        print("Процесс не завершился, отправляем SIGKILL...")
-        os.kill(pid, signal.SIGKILL)
+    print("Запускаем systemd-сервис exchange_bot...")
+    if _run_command(_systemctl_args("start", SERVICE_NAME)):
+        print("Сервис запущен.")
 
 
 def stop() -> None:
-    pid = _running_pid()
-    if not pid:
-        print("Бот не запущен.")
-        PID_FILE.unlink(missing_ok=True)
-        return
-
-    _stop_process(pid)
-    PID_FILE.unlink(missing_ok=True)
-    print("Бот остановлен.")
+    print("Останавливаем systemd-сервис exchange_bot...")
+    if _run_command(_systemctl_args("stop", SERVICE_NAME)):
+        print("Сервис остановлен.")
 
 
 def restart() -> None:
-    print("Перезапуск бота...")
-    stop()
-    start()
+    print("Перезапускаем systemd-сервис exchange_bot...")
+    if _run_command(_systemctl_args("restart", SERVICE_NAME)):
+        print("Сервис перезапущен.")
 
 
 def reload_bot() -> None:
-    pid = _running_pid()
-    if not pid:
-        print("Бот не запущен, reload невозможен. Используйте start.")
-        return
-
-    print("Reload выполняет мягкий перезапуск для перечитывания .env и кода.")
-    _stop_process(pid)
-    start()
+    print("Запускаем reload-or-restart для обмена конфигурацией...")
+    if _run_command(_systemctl_args("reload-or-restart", SERVICE_NAME)):
+        print("Сервис перечитал конфигурацию (или был перезапущен).")
 
 
 def show_logs(lines: int = 40) -> None:
-    if not LOG_FILE.exists():
-        print("Файл логов ещё не создан.")
-        return
-
-    print(f"Последние {lines} строк {LOG_FILE}:")
-    with LOG_FILE.open("r", encoding="utf-8", errors="ignore") as fh:
-        content = fh.readlines()
-    for line in content[-lines:]:
-        print(line.rstrip())
+    print(f"Показываем последние {lines} строк журнала systemd...")
+    _run_command(
+        _journalctl_args("-u", SERVICE_NAME, "-n", str(lines), "--no-pager")
+    )
 
 
 def update_repo() -> None:
@@ -148,14 +159,12 @@ def update_repo() -> None:
 
 
 def delete() -> None:
-    print("Удаляем запущенный бот и сервисные файлы (bot.log, bot.pid)...")
-    stop()
-    for file in (LOG_FILE, PID_FILE):
-        try:
-            file.unlink()
-        except FileNotFoundError:
-            continue
-    print("Удаление завершено. Репозиторий остаётся без изменений.")
+    print("Останавливаем сервис и отключаем автозапуск exchange_bot...")
+    if _run_command(_systemctl_args("disable", "--now", SERVICE_NAME)):
+        print(
+            "Сервис остановлен и отключён. Удалите файл exchange_bot.service вручную,"
+            " если нужно полностью удалить unit."
+        )
 
 
 COMMANDS: Dict[str, Callable[[], None]] = {
@@ -172,14 +181,14 @@ COMMANDS: Dict[str, Callable[[], None]] = {
 
 def _print_menu() -> None:
     descriptions = {
-        "status": "Показать состояние фонового процесса бота",
+        "status": "Показать вывод systemctl status exchange_bot",
         "update": "Обновить код из git-репозитория",
-        "restart": "Остановить и снова запустить бота",
-        "reload": "Перезапустить для перечитывания конфигурации",
-        "logs": "Показать последние строки логов",
-        "stop": "Остановить бота",
-        "start": "Запустить бота",
-        "delete": "Удалить PID/лог и остановить бота",
+        "restart": "Выполнить systemctl restart exchange_bot",
+        "reload": "Выполнить systemctl reload-or-restart exchange_bot",
+        "logs": "Показать journalctl -u exchange_bot",
+        "stop": "Выполнить systemctl stop exchange_bot",
+        "start": "Выполнить systemctl start exchange_bot",
+        "delete": "Выполнить systemctl disable --now exchange_bot",
     }
 
     print(
@@ -216,11 +225,14 @@ def _interactive_loop() -> None:
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
-    if not args:
+    explicit_root, remaining = _consume_root_arg(args)
+    _set_base_dir(_determine_base_dir(explicit_root))
+
+    if not remaining:
         _interactive_loop()
         return
 
-    command = args[0].lower()
+    command = remaining[0].lower()
     if command not in COMMANDS:
         print("Неизвестная команда. Доступные: " + ", ".join(COMMANDS.keys()))
         raise SystemExit(1)

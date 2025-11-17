@@ -1,159 +1,73 @@
-# Exchange Bot
-Exchange Bot is a telegram bot for automating the calculation of currency exchange at current exchange rates based on data from the source app.exchangerate-api.com .
-This project includes everything you need for fast deployment on a VPS.
+<p align="center">
+  <img src="docs/logo.svg" alt="Exchange Bot logo" width="120" />
+</p>
 
-You will need:
+<p align="center">
+  <b>Exchange Bot</b>
+</p>
 
-`API key from app.exchangerate-api.com `
+<p align="center">
+  <a href="README.md">🇬🇧 English</a> |
+  <a href="README.ru.md">🇷🇺 Русский</a>
+</p>
 
-`BOT Token of your TG bot`
+Exchange Bot is a Telegram assistant that shows fresh currency rates and manages a systemd-backed bot service. The `CBR-rates` CLI controls the service from any directory once installed.
 
-## Installation and launch
-Follow the steps below to install and run the bot on your server.
+## Requirements
 
-### Step 1: Preparation
-Make sure that your server meets the following requirements:
+- Linux host with `python3` and `git`
+- Network access to fetch dependencies and currency data
+- Permission to create `/usr/local/bin/CBR-rates` (run installer with sudo if needed)
 
-**Operating system:** `Linux (Ubuntu/Debian)`
+## Quick install (one liner)
 
-**Python:** `3.8 or higher`
+Clone + install + symlink in one command:
 
-**Internet access**
-
-**Installed packages:** `git, python3-pip`
-
-If any of this is not installed, the script will do it for you.
-
-### Step 2: Download and Install
-1. Log in to your server's terminal.
-2. Copy and execute the following set of commands:
-### Download the installation script
-````
-curl -O https://raw.githubusercontent.com/indie-master/exchange_bot/main/setup_exchange_bot.sh
-````
-
-### Making the script executable
-````
-chmod +x setup_exchange_bot.sh
-````
-
-### Running the script
-````
-./setup_exchange_bot.sh
-````
-
-### Step 3: Configuration
-During the execution of the script, you will be asked to enter two parameters:
-
-`API_KEY' is the key for connecting to the Telegram API.
-
-`BOT_TOKEN' is the token of your Telegram bot.
-
-This data will be automatically saved to the '.env` file
-
-### Step 4: Launch
-After the script is completed, the bot will start automatically.
-
-To check its operation, open the log file:
-````
-tail -f bot.log
-````
-Make sure that the bot is active and working correctly.
-
-## Additional
-### CLI manager (CBR-rates)
-After cloning or installing the project you can manage the bot through the interactive CLI helper:
-
-```
-cd ~/exchange_bot
-./CBR-rates
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/<OWNER>/exchange_bot/main/install.sh)
 ```
 
-Running the `CBR-rates` command without arguments opens a menu with the following actions:
+Replace `<OWNER>` with the GitHub owner if your remote differs. The installer will:
+- create/activate a virtual environment under the repo
+- install Python dependencies
+- make `CBR-rates` executable
+- link it into `/usr/local/bin` so it works from any directory
 
-| Command  | Description |
-|----------|-------------|
-| `status` | Show whether the background bot process is running and display the log path. |
-| `update` | Fetch the latest changes from the git repository (`git pull --ff-only`). |
-| `restart`| Stop and start the bot again. |
-| `reload` | Graceful restart that re-reads `.env` and the Python code. |
-| `logs`   | Print the last lines of `bot.log`. |
-| `stop`   | Terminate the background bot process. |
-| `start`  | Start the bot if it is not running. |
-| `delete` | Stop the bot and remove helper files (`bot.log`, `bot.pid`). |
+## Manual install
 
-You can also run a single command directly, for example `./CBR-rates status` or `./CBR-rates restart`.
+```bash
+git clone https://github.com/<OWNER>/exchange_bot.git
+cd exchange_bot
+./install.sh
+```
 
-### Restart the bot
-If you need to restart the bot, run the following commands:
-````
-cd ~/exchange_bot
-source venv/bin/activate`
-nohup python3 exchange_bot.py > bot.log 2>&1 &
-````
+After either path you can immediately run:
 
-### Stopping the bot
-To stop the process, find its ID and complete:
-````
-ps aux | grep exchange_bot.py
-kill <PROCESS_ID>
-````
+```bash
+CBR-rates status
+```
 
-## Setup via Systemd
-### 1. Create a service file:
-Open the editor and create a new file:
+## Usage
 
-````
-sudo nano /etc/systemd/system/exchange_bot.service
-````
+`CBR-rates` talks directly to the `exchange_bot` systemd unit.
 
-Add the following configuration:
-````
-[Unit]
-Description=Exchange Bot
-After=network.target
+```bash
+CBR-rates               # interactive menu
+CBR-rates status        # systemctl status exchange_bot
+CBR-rates restart       # systemctl restart exchange_bot
+CBR-rates logs          # journalctl -u exchange_bot -n 40
+CBR-rates -C /path status   # override repo root for a one-off call
+```
 
-[Service]
-User=<your_user>
-WorkingDirectory=/<your_user>/exchange_bot
-ExecStart=/<your_user>/exchange_bot/venv/bin/python3 exchange_bot.py
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-EnvironmentFile=/<your_user>/exchange_bot/.env
+Root resolution order: `-C/--root` flag → `EXCHANGE_BOT_ROOT` env → symlink/CLI location → current directory. No manual `chmod` or symlink creation is required beyond running `install.sh`.
 
-[Install]
-WantedBy=multi-user.target
-````
+## Configuration
 
-Replace `<your_user>` with your username.
+- Place your bot tokens and API keys in the existing `.env` file if required by the bot.
+- Optional: set `EXCHANGE_BOT_ROOT=/absolute/path/to/exchange_bot` in your shell profile to pin the repo location.
 
-### 2. Restart Systemd and activate the service:
+## Troubleshooting
 
-````
-sudo systemctl daemon-reload
-sudo systemctl enable exchange_bot
-````
-
-### 3. Launch the bot:
-
-````
-sudo systemctl start exchange_bot
-````
-
-### 4. Restart after changes:
-After changing the token or code, restart the service:
-
-````
-sudo systemctl restart exchange_bot
-````
-
-### 5. Checking the status:
-Make sure that the bot is working:
-
-````
-sudo systemctl status exchange_bot
-````
-
-Setting up via Systemd automates restarts and simplifies bot management.
+- **`CBR-rates` not found**: ensure `/usr/local/bin` is in your `PATH` or rerun `./install.sh` with sudo so it can create the symlink.
+- **Python import errors**: rerun `./install.sh` to recreate the virtualenv and dependencies.
+- **Permission denied on systemctl**: use `sudo CBR-rates <command>` if your user cannot control the service.

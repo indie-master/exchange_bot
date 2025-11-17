@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">Exchange Bot logo</title>
+  <desc id="desc">Blue circular badge with a white dollar symbol in the center.</desc>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4DA3FF" />
+      <stop offset="100%" stop-color="#1E62D0" />
+    </linearGradient>
+  </defs>
+  <circle cx="120" cy="120" r="112" fill="url(#grad)" />
+  <circle cx="120" cy="120" r="106" fill="none" stroke="#E5F1FF" stroke-width="8" />
+  <path
+    d="M136 58h-20c-17 0-30 12-30 28 0 17 12 28 32 31l18 2c9 1 14 5 14 11 0 7-6 12-16 12h-22c-9 0-16-7-16-16v-2H76v2c0 21 17 38 38 38h8v16h16v-16c19-2 32-15 32-33 0-17-11-29-30-32l-18-3c-10-1-16-6-16-12 0-7 6-12 14-12h22c8 0 14 6 14 14v2h16v-2c0-18-14-32-32-34V58Z"
+    fill="#FFFFFF" />
+</svg>
