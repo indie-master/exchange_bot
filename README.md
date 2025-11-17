@@ -8,6 +8,45 @@ You will need:
 
 `BOT Token of your TG bot`
 
+## Docker
+If you prefer to run the bot in an isolated container, build the image and supply your
+credentials via environment variables (or an `.env` file):
+
+````bash
+docker build -t exchange-bot .
+
+# pass env vars directly
+docker run --rm \
+  -e BOT_TOKEN=your_token \
+  -e API_KEY=your_api_key \
+  exchange-bot
+
+# or reuse an existing .env file
+docker run --rm --env-file .env exchange-bot
+````
+
+## Manual installation
+If you want to run the bot locally or deploy it manually, follow the steps below:
+
+````bash
+git clone https://github.com/indie-master/exchange_bot.git
+cd exchange_bot
+
+# (optional) create a virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# install dependencies
+pip install -r requirements.txt
+
+# configure environment variables
+echo "BOT_TOKEN=your_token" >> .env
+echo "API_KEY=your_api_key" >> .env
+
+# run the bot
+python3 exchange_bot.py
+````
+
 ## Installation and launch
 Follow the steps below to install and run the bot on your server.
 
@@ -87,6 +126,27 @@ Running the `CBR-rates` command without arguments opens a menu with the followin
 | `delete` | Runs `systemctl disable --now exchange_bot` to stop and disable autostart. |
 
 You can also run a single command directly, for example `./CBR-rates status` or `./CBR-rates restart`.
+
+### Use the CLI from anywhere
+To avoid changing directories every time, create a symlink that points to the CLI and add it to your `$PATH`:
+
+```
+sudo ln -s /home/bot/exchange_bot/CBR-rates /usr/local/bin/CBR-rates
+```
+
+When the CLI is executed through such a symlink (or from another folder) it will automatically switch to the repository root. If the symlink lives outside of the repository, define the target directory explicitly once via the `EXCHANGE_BOT_ROOT` environment variable:
+
+```
+export EXCHANGE_BOT_ROOT=/home/bot/exchange_bot
+```
+
+With the variable set you can call `CBR-rates` from any directory. When you are inside the repository already you can simply run `CBR-rates` (or even `python CBR-rates`) without any additional parameters thanks to the script's automatic root detection. The launcher also walks up from the current directory to locate the repository root, so it works even from nested subfolders. For a one-off invocation outside of the repository you can pass the path explicitly without touching the environment:
+
+```
+CBR-rates -C /home/bot/exchange_bot status
+```
+
+The `-C/--root` flag has priority over `EXCHANGE_BOT_ROOT` and is stripped before the rest of the arguments are forwarded to the CLI menu.
 
 ### Restart the bot
 If you need to restart the bot, trigger the systemd unit (directly or via the CLI helper):

@@ -1,0 +1,12 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+venv
+.env.*
+.DS_Store
+CBR-rates
+setup_exchange_bot.sh
+bot.log

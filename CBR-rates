@@ -1,5 +1,66 @@
 #!/usr/bin/env python3
-from bot_cli import main
+"""Entrypoint for the Exchange Bot CLI (CBR-rates)."""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from pathlib import Path
+from typing import List, Tuple
+
+
+def _parse_root_flag(argv: List[str]) -> Tuple[Path | None, List[str]]:
+    """Extract optional -C/--root argument before importing the CLI."""
+
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-C", "--root", dest="root")
+    known, remaining = parser.parse_known_args(argv)
+
+    if known.root:
+        return Path(known.root).expanduser(), remaining
+    return None, remaining
+
+
+def _detect_repo_root(forced_root: Path | None) -> Path:
+    candidates = []
+    if forced_root:
+        candidates.append(forced_root)
+
+    # When the command is executed from the repository root manually, the
+    # current working directory already contains ``bot_cli.py``. Adding it as a
+    # candidate means developers can run ``python CBR-rates`` without setting
+    # extra flags or environment variables.
+    candidates.append(Path.cwd())
+
+    env_root = os.environ.get("EXCHANGE_BOT_ROOT")
+    if env_root:
+        candidates.append(Path(env_root).expanduser())
+
+    candidates.append(Path(__file__).resolve().parent)
+
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        search_space = [resolved, *resolved.parents]
+        for path in search_space:
+            if (path / "bot_cli.py").exists():
+                return path
+
+    raise SystemExit(
+        "Не найден bot_cli.py. Передайте путь через 'CBR-rates -C /path/to/exchange_bot'"
+        " или установите переменную окружения EXCHANGE_BOT_ROOT.",
+    )
+
+
+forced_root, remaining_argv = _parse_root_flag(sys.argv[1:])
+sys.argv = [sys.argv[0], *remaining_argv]
+
+REPO_ROOT = _detect_repo_root(forced_root)
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+os.chdir(REPO_ROOT)
+from bot_cli import main  # noqa: E402  (импорт зависит от добавленного sys.path)
+
 
 if __name__ == "__main__":
     main()
