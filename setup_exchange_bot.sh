@@ -55,10 +55,35 @@ echo "BOT_TOKEN=$BOT_TOKEN" >> "$ENV_FILE"
 
 echo ".env файл настроен!"
 
-# 7. Запуск бота
-echo "Запускаем бота..."
-nohup python3 exchange_bot.py > bot.log 2>&1 &
+# 7. Создание systemd-сервиса с автозапуском и авто-перезапуском
+SERVICE_FILE="/etc/systemd/system/exchange_bot.service"
+echo "Создаем systemd unit ${SERVICE_FILE}..."
+sudo tee "$SERVICE_FILE" > /dev/null <<EOF
+[Unit]
+Description=Exchange Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=$USER
+WorkingDirectory=$INSTALL_DIR
+EnvironmentFile=$INSTALL_DIR/.env
+ExecStart=$INSTALL_DIR/venv/bin/python3 exchange_bot.py
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Перезагружаем systemd и включаем автозапуск сервиса..."
+sudo systemctl daemon-reload
+sudo systemctl enable --now exchange_bot
 
 echo "=== Установка завершена! ==="
-echo "Бот запущен в фоновом режиме. Логи записываются в bot.log."
+echo "Сервис exchange_bot включен, настроен на автозапуск после перезагрузки и автоматический перезапуск при сбоях."
 

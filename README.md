@@ -45,24 +45,28 @@ chmod +x setup_exchange_bot.sh
 ### Step 3: Configuration
 During the execution of the script, you will be asked to enter two parameters:
 
-`API_KEY' is the key for connecting to the Telegram API.
+`API_KEY` is the key for connecting to the Telegram API.
 
-`BOT_TOKEN' is the token of your Telegram bot.
+`BOT_TOKEN` is the token of your Telegram bot.
 
-This data will be automatically saved to the '.env` file
+This data will be automatically saved to the `.env` file
 
 ### Step 4: Launch
 After the script is completed, the bot will start automatically.
+The installer also registers a `systemd` service that starts on boot and restarts
+the bot if the process exits unexpectedly.
 
 To check its operation, open the log file:
 ````
-tail -f bot.log
+journalctl -u exchange_bot -f
 ````
 Make sure that the bot is active and working correctly.
 
 ## Additional
 ### CLI manager (CBR-rates)
-After cloning or installing the project you can manage the bot through the interactive CLI helper:
+After cloning or installing the project you can manage the bot through the interactive CLI helper.
+The helper proxies every action to the `exchange_bot` systemd service, so make sure you have
+completed the service setup from the section below before using these commands.
 
 ```
 cd ~/exchange_bot
@@ -73,30 +77,31 @@ Running the `CBR-rates` command without arguments opens a menu with the followin
 
 | Command  | Description |
 |----------|-------------|
-| `status` | Show whether the background bot process is running and display the log path. |
+| `status` | Runs `systemctl status exchange_bot --no-pager`. |
 | `update` | Fetch the latest changes from the git repository (`git pull --ff-only`). |
-| `restart`| Stop and start the bot again. |
-| `reload` | Graceful restart that re-reads `.env` and the Python code. |
-| `logs`   | Print the last lines of `bot.log`. |
-| `stop`   | Terminate the background bot process. |
-| `start`  | Start the bot if it is not running. |
-| `delete` | Stop the bot and remove helper files (`bot.log`, `bot.pid`). |
+| `restart`| Executes `systemctl restart exchange_bot`. |
+| `reload` | Calls `systemctl reload-or-restart exchange_bot` to re-read `.env` and code. |
+| `logs`   | Shows the latest journal lines via `journalctl -u exchange_bot -n 40`. |
+| `stop`   | Executes `systemctl stop exchange_bot`. |
+| `start`  | Executes `systemctl start exchange_bot`. |
+| `delete` | Runs `systemctl disable --now exchange_bot` to stop and disable autostart. |
 
 You can also run a single command directly, for example `./CBR-rates status` or `./CBR-rates restart`.
 
 ### Restart the bot
-If you need to restart the bot, run the following commands:
+If you need to restart the bot, trigger the systemd unit (directly or via the CLI helper):
 ````
-cd ~/exchange_bot
-source venv/bin/activate`
-nohup python3 exchange_bot.py > bot.log 2>&1 &
+./CBR-rates restart
+# or
+sudo systemctl restart exchange_bot
 ````
 
 ### Stopping the bot
-To stop the process, find its ID and complete:
+To stop the service entirely, run:
 ````
-ps aux | grep exchange_bot.py
-kill <PROCESS_ID>
+./CBR-rates stop
+# or
+sudo systemctl stop exchange_bot
 ````
 
 ## Setup via Systemd
@@ -111,14 +116,17 @@ Add the following configuration:
 ````
 [Unit]
 Description=Exchange Bot
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 User=<your_user>
 WorkingDirectory=/<your_user>/exchange_bot
 ExecStart=/<your_user>/exchange_bot/venv/bin/python3 exchange_bot.py
-Restart=always
+Restart=on-failure
 RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
 StandardOutput=journal
 StandardError=journal
 EnvironmentFile=/<your_user>/exchange_bot/.env
@@ -133,7 +141,7 @@ Replace `<your_user>` with your username.
 
 ````
 sudo systemctl daemon-reload
-sudo systemctl enable exchange_bot
+sudo systemctl enable --now exchange_bot
 ````
 
 ### 3. Launch the bot:
@@ -156,4 +164,25 @@ Make sure that the bot is working:
 sudo systemctl status exchange_bot
 ````
 
+The unit is enabled for startup after server reboots and will automatically
+restart if the process crashes.
+
 Setting up via Systemd automates restarts and simplifies bot management.
+
+## Troubleshooting
+The script prints `requirements.txt not found`:
+
+Make sure that `requirements.txt` exists in the repository and lists all dependencies.
+
+The bot does not start:
+
+Check the logs via `journalctl -u exchange_bot` for additional diagnostic information.
+
+You need to update the bot code:
+
+Run the following commands to fetch the latest version:
+
+````
+cd ~/exchange_bot
+git pull
+````
