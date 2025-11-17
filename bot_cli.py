@@ -6,7 +6,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Tuple
 
 BASE_DIR = Path(__file__).resolve().parent
 SERVICE_NAME = "exchange_bot"
@@ -46,6 +46,59 @@ def _run_command(command: list[str], *, capture: bool = True) -> bool:
             joined = " ".join(command)
             print(f"Команда '{joined}' завершилась с кодом {result.returncode}.")
     return result.returncode == 0
+
+
+def _consume_root_arg(args: list[str]) -> Tuple[Optional[Path], list[str]]:
+    """Extract -C/--root if provided, returning the path and remaining args."""
+
+    if not args:
+        return None, args
+
+    normalized = []
+    root: Optional[Path] = None
+    skip_next = False
+    for idx, value in enumerate(args):
+        if skip_next:
+            skip_next = False
+            continue
+        if value in {"-C", "--root"}:
+            if idx + 1 >= len(args):
+                print("Флаг -C/--root требует путь после себя.")
+                raise SystemExit(1)
+            root = Path(args[idx + 1]).expanduser().resolve()
+            skip_next = True
+            continue
+        normalized.append(value)
+    return root, normalized
+
+
+def _find_repo_upwards(start: Path) -> Optional[Path]:
+    """Walk up from *start* until bot_cli.py is found or root is reached."""
+
+    current = start.resolve()
+    for ancestor in [current, *current.parents]:
+        if (ancestor / "bot_cli.py").exists():
+            return ancestor
+    return None
+
+
+def _determine_base_dir(explicit: Optional[Path]) -> Path:
+    """Return the repository root, honoring overrides and fallbacks."""
+
+    env_root = os.environ.get("EXCHANGE_BOT_ROOT")
+    candidates = [explicit, Path(env_root).expanduser().resolve() if env_root else None]
+    candidates.append(_find_repo_upwards(Path.cwd()))
+    candidates.append(Path(__file__).resolve().parent)
+
+    for candidate in candidates:
+        if candidate and (candidate / "bot_cli.py").exists():
+            return candidate
+    return Path(__file__).resolve().parent
+
+
+def _set_base_dir(path: Path) -> None:
+    global BASE_DIR
+    BASE_DIR = path
 
 
 def status() -> None:
@@ -166,11 +219,14 @@ def _interactive_loop() -> None:
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
-    if not args:
+    explicit_root, remaining = _consume_root_arg(args)
+    _set_base_dir(_determine_base_dir(explicit_root))
+
+    if not remaining:
         _interactive_loop()
         return
 
-    command = args[0].lower()
+    command = remaining[0].lower()
     if command not in COMMANDS:
         print("Неизвестная команда. Доступные: " + ", ".join(COMMANDS.keys()))
         raise SystemExit(1)

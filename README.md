@@ -110,26 +110,27 @@ Running the `CBR-rates` command without arguments opens a menu with the followin
 
 You can also run a single command directly, for example `./CBR-rates status` or `./CBR-rates restart`.
 
-### Use the CLI from anywhere
-To avoid changing directories every time, create a symlink that points to the CLI and add it to your `$PATH`:
+#### Run from any directory
+If you prefer not to `cd` into the repo every time:
 
-```
-sudo ln -s /home/bot/exchange_bot/CBR-rates /usr/local/bin/CBR-rates
-```
+1. Create a symlink somewhere on your `$PATH`:
+   ```bash
+   sudo ln -s /home/bot/exchange_bot/CBR-rates /usr/local/bin/CBR-rates
+   ```
+2. When the symlink lives outside the repository, point the CLI to the repo root:
+   ```bash
+   export EXCHANGE_BOT_ROOT=/home/bot/exchange_bot
+   ```
+3. Now `CBR-rates` can be invoked from anywhere. The helper will climb up from the
+   current directory to find `bot_cli.py`, then fall back to the resolved symlink path
+   or the `EXCHANGE_BOT_ROOT` hint.
 
-When the CLI is executed through such a symlink (or from another folder) it will automatically switch to the repository root. If the symlink lives outside of the repository, define the target directory explicitly once via the `EXCHANGE_BOT_ROOT` environment variable:
+For a one-off call you can pass the path explicitly with `-C/--root` (it overrides
+the environment variable):
 
-```
-export EXCHANGE_BOT_ROOT=/home/bot/exchange_bot
-```
-
-With the variable set you can call `CBR-rates` from any directory. When you are inside the repository already you can simply run `CBR-rates` (or even `python CBR-rates`) without any additional parameters thanks to the script's automatic root detection. The launcher also walks up from the current directory to locate the repository root, so it works even from nested subfolders. For a one-off invocation outside of the repository you can pass the path explicitly without touching the environment:
-
-```
+```bash
 CBR-rates -C /home/bot/exchange_bot status
 ```
-
-The `-C/--root` flag has priority over `EXCHANGE_BOT_ROOT` and is stripped before the rest of the arguments are forwarded to the CLI menu.
 
 ### Restart the bot
 If you need to restart the bot, trigger the systemd unit (directly or via the CLI helper):
@@ -168,6 +169,8 @@ WorkingDirectory=/<your_user>/exchange_bot
 ExecStart=/<your_user>/exchange_bot/venv/bin/python3 exchange_bot.py
 Restart=on-failure
 RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
 StandardOutput=journal
 StandardError=journal
 EnvironmentFile=/<your_user>/exchange_bot/.env
