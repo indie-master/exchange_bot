@@ -92,10 +92,12 @@ chmod +x setup_exchange_bot.sh
 
 ### Шаг 4: Запуск
 После завершения скрипта бот запустится автоматически.
+Инсталлятор также регистрирует `systemd`-сервис, который стартует при загрузке
+сервера и автоматически перезапускает бота после сбоев процесса.
 
 Для проверки его работы, откройте файл логов:
 ````
-tail -f bot.log
+journalctl -u exchange_bot -f
 ````
 Убедитесь, что бот активен и работает корректно.
 
@@ -174,14 +176,17 @@ sudo nano /etc/systemd/system/exchange_bot.service
 ````
 [Unit]
 Description=Exchange Bot
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 User=<ваш_пользователь>
 WorkingDirectory=/<ваш_пользователь>/exchange_bot
 ExecStart=/<ваш_пользователь>/exchange_bot/venv/bin/python3 exchange_bot.py
-Restart=always
+Restart=on-failure
 RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
 StandardOutput=journal
 StandardError=journal
 EnvironmentFile=/<ваш_пользователь>/exchange_bot/.env
@@ -196,7 +201,7 @@ WantedBy=multi-user.target
 
 ````
 sudo systemctl daemon-reload
-sudo systemctl enable exchange_bot
+sudo systemctl enable --now exchange_bot
 ````
 
 ### 3. Запустите бота:
@@ -219,6 +224,9 @@ sudo systemctl restart exchange_bot
 sudo systemctl status exchange_bot
 ````
 
+Unit включён для автозапуска после перезагрузки сервера и автоматически
+перезапускает процесс при сбоях.
+
 Настройка через Systemd автоматизирует перезапуск и упрощает управление ботом.
 
 ## Проблемы и решения
@@ -227,7 +235,7 @@ sudo systemctl status exchange_bot
 Убедитесь, что файл `requirements.txt` добавлен в репозиторий и содержит список всех зависимостей.
 Бот не запускается:
 
-Проверьте логи `(bot.log)` для получения дополнительной информации о проблеме.
+Проверьте логи через `journalctl -u exchange_bot` для получения дополнительной информации о проблеме.
 
 Необходимо обновить код бота:
 

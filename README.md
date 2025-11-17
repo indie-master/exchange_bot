@@ -92,10 +92,12 @@ This data will be automatically saved to the `.env` file
 
 ### Step 4: Launch
 After the script is completed, the bot will start automatically.
+The installer also registers a `systemd` service that starts on boot and restarts
+the bot if the process exits unexpectedly.
 
 To check its operation, open the log file:
 ````
-tail -f bot.log
+journalctl -u exchange_bot -f
 ````
 Make sure that the bot is active and working correctly.
 
@@ -174,14 +176,17 @@ Add the following configuration:
 ````
 [Unit]
 Description=Exchange Bot
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 User=<your_user>
 WorkingDirectory=/<your_user>/exchange_bot
 ExecStart=/<your_user>/exchange_bot/venv/bin/python3 exchange_bot.py
-Restart=always
+Restart=on-failure
 RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
 StandardOutput=journal
 StandardError=journal
 EnvironmentFile=/<your_user>/exchange_bot/.env
@@ -196,7 +201,7 @@ Replace `<your_user>` with your username.
 
 ````
 sudo systemctl daemon-reload
-sudo systemctl enable exchange_bot
+sudo systemctl enable --now exchange_bot
 ````
 
 ### 3. Launch the bot:
@@ -219,6 +224,9 @@ Make sure that the bot is working:
 sudo systemctl status exchange_bot
 ````
 
+The unit is enabled for startup after server reboots and will automatically
+restart if the process crashes.
+
 Setting up via Systemd automates restarts and simplifies bot management.
 
 ## Troubleshooting
@@ -228,7 +236,7 @@ Make sure that `requirements.txt` exists in the repository and lists all depende
 
 The bot does not start:
 
-Check the logs (`bot.log`) for additional diagnostic information.
+Check the logs via `journalctl -u exchange_bot` for additional diagnostic information.
 
 You need to update the bot code:
 
