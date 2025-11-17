@@ -53,16 +53,20 @@ chmod +x setup_exchange_bot.sh
 
 ### Шаг 4: Запуск
 После завершения скрипта бот запустится автоматически.
+Инсталлятор также регистрирует `systemd`-сервис, который стартует при загрузке
+сервера и автоматически перезапускает бота после сбоев процесса.
 
 Для проверки его работы, откройте файл логов:
 ````
-tail -f bot.log
+journalctl -u exchange_bot -f
 ````
 Убедитесь, что бот активен и работает корректно.
 
 ## Дополнительно
 ### CLI-менеджер (CBR-rates)
 После установки проекта можно управлять ботом через интерактивный CLI.
+Менеджер перенаправляет все действия в systemd-сервис `exchange_bot`, поэтому перед
+использованием убедитесь, что вы настроили сервис согласно инструкции ниже.
 
 ```
 cd ~/exchange_bot
@@ -73,30 +77,53 @@ cd ~/exchange_bot
 
 | Команда   | Что делает |
 |-----------|------------|
-| `status`  | Показывает, запущен ли бот, и путь к файлу логов. |
+| `status`  | Выполняет `systemctl status exchange_bot --no-pager`. |
 | `update`  | Выполняет `git pull --ff-only` для обновления кода. |
-| `restart` | Останавливает и запускает бота заново. |
-| `reload`  | Мягкий перезапуск для перечитывания `.env` и исходного кода. |
-| `logs`    | Выводит последние строки файла `bot.log`. |
-| `stop`    | Останавливает фоновый процесс бота. |
-| `start`   | Запускает бота, если он не работает. |
-| `delete`  | Останавливает бота и удаляет служебные файлы (`bot.log`, `bot.pid`). |
+| `restart` | Запускает `systemctl restart exchange_bot`. |
+| `reload`  | Вызывает `systemctl reload-or-restart exchange_bot` для перечитывания `.env` и кода. |
+| `logs`    | Показывает последние строки журнала через `journalctl -u exchange_bot -n 40`. |
+| `stop`    | Выполняет `systemctl stop exchange_bot`. |
+| `start`   | Выполняет `systemctl start exchange_bot`. |
+| `delete`  | Выполняет `systemctl disable --now exchange_bot`, отключая автозапуск. |
 
 Любую команду можно вызвать напрямую, например `./CBR-rates status` или `./CBR-rates restart`.
 
+#### Запуск из любого каталога
+Чтобы не заходить в каталог бота каждый раз:
+
+1. Создайте симлинк в директории, которая находится в `$PATH`:
+   ```bash
+   sudo ln -s /home/bot/exchange_bot/CBR-rates /usr/local/bin/CBR-rates
+   ```
+2. Если симлинк лежит вне корня репозитория, подскажите CLI путь до него:
+   ```bash
+   export EXCHANGE_BOT_ROOT=/home/bot/exchange_bot
+   ```
+3. Теперь `CBR-rates` можно запускать из любого места. Скрипт сам найдёт репозиторий
+   (поднимается вверх по текущему каталогу и ищет `bot_cli.py`, а затем использует
+   путь из симлинка/переменной).
+
+Для единичного запуска можно сразу передать путь до репозитория флагом `-C/--root`
+— он имеет приоритет над переменной окружения:
+
+```bash
+CBR-rates -C /home/bot/exchange_bot status
+```
+
 ### Перезапуск бота
-Если вам нужно перезапустить бота, выполните следующие команды:
+Если нужно перезапустить бота, вызовите unit через CLI или напрямую:
 ````
-cd ~/exchange_bot
-source venv/bin/activate`
-nohup python3 exchange_bot.py > bot.log 2>&1 &
+./CBR-rates restart
+# или
+sudo systemctl restart exchange_bot
 ````
 
 ### Остановка бота
-Для остановки процесса найдите его ID и завершите:
+Для полной остановки сервиса выполните:
 ````
-ps aux | grep exchange_bot.py
-kill <PROCESS_ID>
+./CBR-rates stop
+# или
+sudo systemctl stop exchange_bot
 ````
 
 ## Настройка через Systemd
@@ -111,14 +138,17 @@ sudo nano /etc/systemd/system/exchange_bot.service
 ````
 [Unit]
 Description=Exchange Bot
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 User=<ваш_пользователь>
 WorkingDirectory=/<ваш_пользователь>/exchange_bot
 ExecStart=/<ваш_пользователь>/exchange_bot/venv/bin/python3 exchange_bot.py
-Restart=always
+Restart=on-failure
 RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
 StandardOutput=journal
 StandardError=journal
 EnvironmentFile=/<ваш_пользователь>/exchange_bot/.env
@@ -133,7 +163,7 @@ WantedBy=multi-user.target
 
 ````
 sudo systemctl daemon-reload
-sudo systemctl enable exchange_bot
+sudo systemctl enable --now exchange_bot
 ````
 
 ### 3. Запустите бота:
@@ -156,6 +186,9 @@ sudo systemctl restart exchange_bot
 sudo systemctl status exchange_bot
 ````
 
+Unit включён для автозапуска после перезагрузки сервера и автоматически
+перезапускает процесс при сбоях.
+
 Настройка через Systemd автоматизирует перезапуск и упрощает управление ботом.
 
 ## Проблемы и решения
@@ -164,7 +197,7 @@ sudo systemctl status exchange_bot
 Убедитесь, что файл `requirements.txt` добавлен в репозиторий и содержит список всех зависимостей.
 Бот не запускается:
 
-Проверьте логи `(bot.log)` для получения дополнительной информации о проблеме.
+Проверьте логи через `journalctl -u exchange_bot` для получения дополнительной информации о проблеме.
 
 Необходимо обновить код бота:
 
